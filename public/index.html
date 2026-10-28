@@ -427,9 +427,8 @@ h1{font-size:clamp(24px,7.5vw,34px)}
   <div class="hello"><h1 id="wl">Bonjour</h1><button class="btn alt sm" id="wout" type="button">Déconnexion</button></div>
   <p class="date" id="wd"></p>
   <button class="btn alt sm" id="hsup" type="button" style="margin:0 0 14px">Assistance technique WhatsApp</button>
-  <button type="button" class="promo" id="wb" data-to="histo" hidden></button>
   <button type="button" class="promo" id="bkb" data-to="params" hidden></button>
-  <button type="button" class="promo" id="sb" data-to="histo" hidden></button>
+  <button type="button" class="promo" id="sb" data-to="suivi" hidden></button>
   <button type="button" class="promo" id="gsb" data-to="params" hidden>Synchronisation Google Drive en pause : touchez pour reconnecter.</button>
   <h2 style="margin-top:8px">Recherche</h2>
   <div class="seg" id="wcrit" role="group" aria-label="Chercher par">
@@ -751,7 +750,7 @@ h1{font-size:clamp(24px,7.5vw,34px)}
   <button title="CGA Canal" type="button" data-to="cga"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M12 17v4"/></svg><span>CGA</span></button>
   <button title="Listing" type="button" data-to="listing"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg><span>Listing</span></button>
   <button title="Factures" type="button" data-to="convert"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg><span>Factures</span></button>
-  <button title="Historique" type="button" data-to="histo"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>Historique</span></button>
+  
   <button title="Paramètres" type="button" data-to="params"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg><span>Paramètres</span></button>
 </nav>
 <div class="fvm" id="fiche2" hidden role="dialog" aria-modal="true" aria-labelledby="f2n"><div class="fch">
@@ -924,7 +923,7 @@ loadCfg();
 function say(id,t,cls){const e=$(id);e.className="msg "+(cls||"");e.textContent=t}
 function hidePw(){$("pw").type="password";$("eye").setAttribute("aria-pressed","false");$("eye").setAttribute("aria-label","Afficher le mot de passe")}
 function view(){$("login").hidden=!!token;$("app").hidden=!token;document.body.classList.toggle("lg",!token);hidePw();if(token){try{updBadge()}catch(e){}}}
-function logout(t){token=null;ACCT="";vcTok=null;relPend=null;uid="";gBootUid=null;GM=null;gTok=null;CLI=null;cfg={...DEF};try{sessionStorage.removeItem("tk");sessionStorage.removeItem("uid");sessionStorage.removeItem("cacct");sessionStorage.removeItem("veo_tk");localStorage.removeItem("clara_keep")}catch(e){}view();say("lm",t||"","err")}
+function logout(t){try{localStorage.removeItem(K("clara_vct"))}catch(e){}token=null;ACCT="";vcTok=null;relPend=null;uid="";gBootUid=null;GM=null;gTok=null;CLI=null;cfg={...DEF};try{sessionStorage.removeItem("tk");sessionStorage.removeItem("uid");sessionStorage.removeItem("cacct");sessionStorage.removeItem("veo_tk");localStorage.removeItem("clara_keep")}catch(e){}view();say("lm",t||"","err")}
 
 function getConn(){try{return JSON.parse(localStorage.getItem(K("clara_conn"))||"{}")||{}}catch(e){return{}}}
 function setConn(o){try{localStorage.setItem(K("clara_conn"),JSON.stringify(o));return true}catch(e){return false}}
@@ -932,12 +931,13 @@ async function post(path,body,auth){
   const full=/^https:\/\//i.test(path),u=full?path:API+path,isApi=u.indexOf(API)===0;
   const call=async()=>{const h={"Content-Type":"application/json"};if(auth&&vcTok&&isApi)h.Authorization="Bearer "+vcTok;
     const r=await fetch(u,{method:"POST",headers:h,body:JSON.stringify(body)});let d=null;try{d=await r.json()}catch(e){}return {status:r.status,data:d}};
+  if(auth&&!vcTok&&isApi){try{vcTok=localStorage.getItem(K("clara_vct"))||null}catch(e){}}
   if(auth&&!vcTok&&isApi&&path!=="/auth/login")await vcLogin();
   let x=await call();
-  if(auth&&isApi&&path!=="/auth/login"&&(x.status===401||x.status===403)){vcTok=null;if(await vcLogin())x=await call()}
+  if(auth&&isApi&&path!=="/auth/login"&&(x.status===401||x.status===403)){vcTok=null;try{localStorage.removeItem(K("clara_vct"))}catch(e){}if(await vcLogin())x=await call()}
   return x}
 async function vcLogin(){const c=getConn().vc;if(!c||!c.id||!c.pw)return false;
-  try{const r=await post("/auth/login",{contact:c.id,password:c.pw},false);if(r.data&&r.data.success&&r.data.token){vcTok=r.data.token;return true}}catch(e){}return false}
+  try{const r=await post("/auth/login",{contact:c.id,password:c.pw},false);if(r.data&&r.data.success&&r.data.token){vcTok=r.data.token;try{localStorage.setItem(K("clara_vct"),vcTok)}catch(e){}return true}}catch(e){}return false}
 /* ===== Moteurs de recherche / réactivation interchangeables ===== */
 const ENGINES={
   vc:{hint:"Téléphone ou e-mail de votre compte VisionsCanal",
@@ -1243,7 +1243,7 @@ $("f2h").onclick=()=>{const r=fiR;if(!r)return;if(r.hid)delete r.hid;else{favSet
 
 /* Navigation */
 function go(p){
-  if(document.body.dataset.mode==="simple"&&["listing","convert","histo"].includes(p))p="home";
+  if(p==="histo")p="suivi";if(document.body.dataset.mode==="simple"&&["listing","convert","histo"].includes(p))p="home";
   if(relPend&&p!=="relance"){say("lmm","Choisissez d'abord le statut de la relance en cours.","err");return}
   try{srcFix()}catch(e){}
   try{if(window.lsMerge)lsMerge()}catch(e){}
@@ -1482,7 +1482,7 @@ function due(){const t=new Date(),out=[],R=rel();t.setHours(0,0,0,0);
   Object.values(cli()).forEach(x=>{if(x.hid)return;const d=parseD(x.fin);if(!d)return;
     const n=Math.round((d-t)/J);if(n<=jr()&&n>=-90){const lr=R.find(r=>r.k===x.k&&r.ech===x.fin);out.push({x,n,done:isPend(x,R),c:lr?lr.canal:""})}});
   return out.sort((a,b)=>a.n-b.n)}
-function updBadge(){if(!token)return;if(gBootUid!==uid){gBootUid=uid;gBoot()}try{updBadge2();updBk();notifyDue();$("wb").hidden=$("sb").hidden;$("wb").textContent=$("sb").textContent}catch(e){}}
+function updBadge(){if(!token)return;if(gBootUid!==uid){gBootUid=uid;gBoot()}try{updBadge2();updBk();notifyDue()}catch(e){}}
 function updBadge2(){const n=due().filter(v=>!v.done).length,b=$("bd"),s=$("sb");
   b.hidden=!n;b.textContent=n;s.hidden=!n;
   s.textContent=n+" abonnement"+(n>1?"s":"")+" à relancer (échéance dans "+jr()+" jours ou moins)"}
@@ -2035,9 +2035,15 @@ async function gSync(interactive){
   try{
     const t=await gAuth(interactive);
     const q=encodeURIComponent("name='"+gName()+"' and trashed=false");
-    const f=await(await gFetch(t,"https://www.googleapis.com/drive/v3/files?spaces=drive&orderBy=createdTime&fields=files(id)&q="+q)).json();
-    const id=f.files&&f.files[0]?f.files[0].id:null;let remote=null;
-    if(id){try{remote=await(await gFetch(t,"https://www.googleapis.com/drive/v3/files/"+id+"?alt=media")).json()}catch(e){if(e.auth||e.net||e instanceof TypeError)throw e;if(e.st)throw e;remote=null}}
+    const lookup=async()=>{const f=await(await gFetch(t,"https://www.googleapis.com/drive/v3/files?spaces=drive&orderBy=createdTime&fields=files(id)&q="+q)).json();return f.files&&f.files[0]?f.files[0].id:null};
+    const dl=async(i)=>(await gFetch(t,"https://www.googleapis.com/drive/v3/files/"+i+"?alt=media")).json();
+    let id=m.fid||null,remote=null;
+    if(!id)id=await lookup();
+    if(id){try{remote=await dl(id)}catch(e){
+      if(e.auth||e.net||e instanceof TypeError)throw e;
+      if(e.st&&m.fid){m.fid=null;id=await lookup();remote=null;if(id){try{remote=await dl(id)}catch(e2){if(e2.auth||e2.net||e2 instanceof TypeError||e2.st)throw e2;remote=null}}}
+      else if(e.st)throw e;else remote=null}}
+    m.fid=id||null;
     let ch=false;gQuiet=true;
     try{gBump();if(remote&&remote.app==="CLARA")ch=gMerge(remote);gSnap()}finally{gQuiet=false}
     if(ch)loadCfg();
@@ -2076,12 +2082,12 @@ $("gsy").onclick=()=>gSync(true);
 $("gdis").onclick=()=>{try{localStorage.removeItem(K("clara_gd"))}catch(e){}
   try{if(gTok&&window.google&&google.accounts&&google.accounts.oauth2)google.accounts.oauth2.revoke(gTok,()=>{})}catch(e){}
   gTok=null;gExp=0;try{sessionStorage.removeItem("clara_gtk")}catch(e){}$("gsb").hidden=true;gUI("off")};
-function gBoot(){if(gOn())setTimeout(()=>gSync(false),1200);gUI()}
+function gBoot(){if(gOn()){const m=gMeta();if(m.dirty||!m.last||Date.now()-m.last>3e5)setTimeout(()=>gSync(false),1200)}gUI()}
 window.addEventListener("online",()=>{if(token&&gOn())gSched()});
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&token&&gOn()){const m=gMeta();if(!m.last||Date.now()-m.last>6e4)gSched()}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&token&&gOn()){const m=gMeta();if(m.dirty||!m.last||Date.now()-m.last>3e5)gSched()}});
 
 /* ===== PWA : installation et mises à jour (hébergement https uniquement) ===== */
-const APP_VERSION="5.2.0";
+const APP_VERSION="5.3.0";
 if(/netlify/i.test(location.hostname))document.documentElement.classList.add("nb");   /* le badge « Powered by Netlify » masque le bas de l'écran */
 let swReg=null,dip=null,updating=false;
 function showUpd(w){$("upd").hidden=false;$("updb").onclick=()=>{updating=true;w.postMessage("SKIP_WAITING")}}

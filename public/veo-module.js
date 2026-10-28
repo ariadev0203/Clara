@@ -13,7 +13,7 @@
   const pdate = s => { const m = /(\d+)\/(\d+)\/(\d+)/.exec(s || ""); return m ? new Date(+m[3], m[2] - 1, +m[1]) : null; };
   const fnd = (o, k, r = []) => { if (o && typeof o === "object") for (const x in o) { if (x === k && o[x]) r.push(String(o[x])); else fnd(o[x], k, r); } return r; };
   let vt = null, vc = null, PEND = "", RN = null, VTAB = "h", PAGE = 0, CAC = {}; const ITEMS = {};
-  try { vt = sessionStorage.getItem("veo_tk"); } catch (e) {}
+  try { vt = localStorage.getItem("veo_tk") || sessionStorage.getItem("veo_tk"); } catch (e) {}
 
   const css = document.createElement("style");
   css.textContent = `.vseg{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}.vseg button{flex:1 1 auto;min-width:0;white-space:nowrap;border:1.5px solid var(--line,#ccc);background:var(--card,#fff);color:var(--ink,#111);border-radius:999px;padding:10px 14px;font:inherit;font-weight:600;cursor:pointer}
@@ -27,7 +27,7 @@
   async function api(path, method = "GET", body, blob) {
     const go = () => fetch(FN, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ path, method, body, token: vt }) });
     let r = await go();
-    if (r.status === 401 && vc && path !== "/auth/login") { await login(vc.u, vc.p); r = await go(); }
+    if (r.status === 401 && path !== "/auth/login") { const kc = conn().veo, c = vc || (kc && kc.id && kc.pw ? { u: kc.id, p: kc.pw } : null); if (c) { await login(c.u, c.p); r = await go(); } }
     if (!r.ok) { let m = ""; try { m = String((await r.json()).message || ""); } catch (e) {} throw new Error(path === "/auth/login" ? (m || "Identifiants Veo Pro incorrects.") : r.status === 401 ? "Session Veo expirée : reconnectez-vous" : (m || "Erreur " + r.status)); }
     return blob ? r.blob() : r.json();
   }
@@ -37,7 +37,7 @@
     const c = conn().veo; if (vt || !c || !c.id || !c.pw || Date.now() - lastTry < 6e4) return !!vt; lastTry = Date.now();
     try { await login(c.id, c.pw); return true; } catch (e) { return false; }
   }
-  async function login(u, p) { const j = await api("/auth/login", "POST", { username: u, password: p }); vt = j.token; vc = { u, p }; try { sessionStorage.setItem("veo_tk", vt); } catch (e) {} }
+  async function login(u, p) { const j = await api("/auth/login", "POST", { username: u, password: p }); vt = j.token; vc = { u, p }; try { localStorage.setItem("veo_tk", vt); } catch (e) {} }
   window.veoLogin = async (u, p) => { await login(u, p); ls("veo_user", u); };
 
   /* ---------- structure ---------- */
@@ -53,7 +53,7 @@
     else if (!vt && ["suivi", "relance", "home", "veo"].includes(p) && typeof token !== "undefined" && token) autoLogin().then(ok => { if (ok && p === "veo" && !sec.hidden) show(); else if (ok) autoThrottle(); });
     return r; };
   /* déconnexion de CLARA : la session Veo est fermée aussi */
-  const lo0 = window.logout; window.logout = function () { vt = null; vc = null; CAC = {}; Object.keys(ITEMS).forEach(k => delete ITEMS[k]); try { sessionStorage.removeItem("veo_tk"); } catch (e) {} return lo0.apply(this, arguments); };
+  const lo0 = window.logout; window.logout = function () { vt = null; vc = null; CAC = {}; Object.keys(ITEMS).forEach(k => delete ITEMS[k]); try { sessionStorage.removeItem("veo_tk"); localStorage.removeItem("veo_tk"); } catch (e) {} return lo0.apply(this, arguments); };
 
   function show() {
     if (!vt) {
@@ -63,7 +63,7 @@
     }
     sec.innerHTML = `<h1>Veo Pro</h1><div class="vseg" id="vtabs" role="group" aria-label="Rubriques Veo">${[["h", "Accueil"], ["s", "Souscriptions"], ["c", "Commissions"]].map(([k, t]) => `<button type="button" data-t="${k}" aria-pressed="${VTAB === k}">${t}</button>`).join("")}</div><div id="vbody"></div><div class="acts"><button class="btn ghost sm" id="vx" type="button">Déconnexion Veo</button></div>`;
     $q("vtabs").querySelectorAll("button").forEach(b => b.onclick = () => { VTAB = b.dataset.t; show(); });
-    $q("vx").onclick = () => { vt = null; vc = null; try { sessionStorage.removeItem("veo_tk"); } catch (e) {} show(); };
+    $q("vx").onclick = () => { vt = null; vc = null; try { sessionStorage.removeItem("veo_tk"); localStorage.removeItem("veo_tk"); } catch (e) {} show(); };
     ({ h: vHome, s: vSubs, c: vComm })[VTAB]();
   }
 
@@ -268,8 +268,8 @@
     }
     putCli(); return { n, created };
   }
-  let lastAuto = 0;
-  const autoThrottle = () => { if (Date.now() - lastAuto < 18e4) return; lastAuto = Date.now(); autoSync().then(r => { if (r.n) { try { lstRefresh(); } catch (e) {} } }).catch(() => {}); };
+  let lastAuto = 0; try { lastAuto = +localStorage.getItem("veo_la") || 0; } catch (e) {}
+  const autoThrottle = () => { if (Date.now() - lastAuto < 3e5) return; lastAuto = Date.now(); try { localStorage.setItem("veo_la", String(lastAuto)); } catch (e) {} autoSync().then(r => { if (r.n) { try { lstRefresh(); } catch (e) {} } }).catch(() => {}); };
   async function vall(out) {
     out = (out && out.nodeType) ? out : $q("va"); const say2 = t => { if (out) out.textContent = t; };
     let det = 0, cre = 0;
