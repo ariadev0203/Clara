@@ -35,3 +35,10 @@ Dans public/index.html, objet ENGINES : ajouter une entrée { hint, find(field, 
 - Suivi : le ticket est suivi automatiquement, ou à la demande avec « Vérifier l'état ».
 - Une seule connexion à Sygalin : la session est réutilisée tant qu'elle est valable.
 - Mise à jour : remplacer public/ et netlify/functions/ (nouveau fichier sygalin.js).
+
+## Version 5.3 : rapidité
+- Bannière « à relancer » en double supprimée (une seule, elle ouvre Suivi).
+- Rubrique Historique retirée du menu (Suivi couvre « à relancer »).
+- Connexions conservées sur l'appareil : Vision Canal et Veo Pro ne se reconnectent plus à chaque ouverture (reconnexion seulement si la session expire). CGA et Sygalin n'étaient déjà connectés qu'à la demande.
+- Google Drive : identifiant du fichier mémorisé (une requête de moins), synchronisation à l'ouverture seulement si plus de 5 min ou modifications non envoyées.
+- Veo Pro : vérification automatique au plus toutes les 5 min, même après fermeture de l'application.
