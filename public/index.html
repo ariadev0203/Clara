@@ -1306,15 +1306,23 @@ async function wsearch(){
   }catch(e){say("wm","Erreur d'affichage : "+(e&&e.message||e),"err")}
   $("wgo").disabled=false}
 /* Résultat choisi : déjà enregistré -> on l'ouvre ; sinon enregistrement automatique (contact obligatoire) */
-function choose(a){cur=a;$("wres").innerHTML="";say("wm","");
+/* Le moteur CGA ne donne pas le téléphone : on le demande à Vision Canal (par N° abonné). La saisie manuelle n'est exigée que si Vision Canal n'a vraiment aucun numéro. */
+async function vcEnrich(a){
+  if(!a||okTel(a.telephone)||!a.numabo)return a;
+  try{const v=await ENGINES.vc.find("numabo",String(a.numabo));
+    const m=(v.list||[]).find(x=>String(x.numabo)===String(a.numabo))||((v.list||[]).length===1?v.list[0]:null);
+    if(m){if(okTel(m.telephone))a.telephone=m.telephone;if(!a.email&&m.email)a.email=m.email}}catch(e){}
+  return a}
+async function choose(a){cur=a;$("wres").innerHTML="";say("wm","");
   const r=recFor(a);if(r){logAct("Consultation fiche",r);go("reabo");return}
+  if(!okTel(a.telephone)&&engId()==="cga"){say("wm","Recherche du contact chez Vision Canal…");await vcEnrich(a);say("wm","")}
   if(okTel(a.telephone))regGo(a,"");else askContact(a)}
 function regGo(a,tel){cur=a;
   if(!ensureRec()){say("wm","Enregistrement impossible : n° d'abonné et de décodeur absents, ou stockage de l'appareil indisponible.","err");return}
   const r=recFor(cur);if(r&&tel){r.tel=normP(tel);r.tmod=Date.now();r.mod=Date.now();putCli();cur=curOf(r)}
   go("reabo");say("rm","Client enregistré sur cet appareil.","ok")}
 let ctA=null;
-function askContact(a){ctA=a;$("ctp").textContent="Le serveur n'a aucun numéro pour "+nomDe(a)+". Saisissez son téléphone : sans contact, le client ne peut être ni enregistré ni relancé.";$("cti").value="";say("ctm","");$("ctdlg").showModal();$("cti").focus()}
+function askContact(a){ctA=a;$("ctp").textContent="Ni le serveur ni Vision Canal n'ont de numéro pour "+nomDe(a)+". Saisissez son téléphone : sans contact, le client ne peut être ni enregistré ni relancé.";$("cti").value="";say("ctm","");$("ctdlg").showModal();$("cti").focus()}
 $("ctno").onclick=()=>{$("ctdlg").close();ctA=null};
 $("ctok").onclick=()=>{const n=normP($("cti").value);if(!okTel(n)){say("ctm","Numéro invalide : 9 chiffres (ex. 671080340).","err");return}const a=ctA;$("ctdlg").close();ctA=null;regGo(a,n)};
 $("cti").onkeydown=e=>{if(e.key==="Enter")$("ctok").click()};
@@ -1407,6 +1415,7 @@ async function refreshRec(r){
   if(res.status===429)return{err:"busy"};
   const s=res.list.find(x=>(r.ab&&String(x.numabo)===r.ab)||(r.dec&&String(x.numdecabo)===r.dec))||(res.list.length===1?res.list[0]:null);
   if(!s)return{err:"none"};
+  if(engId()==="cga"&&!okTel(s.telephone))await vcEnrich(s);
   const ch=syncRec(r,s);putCli();return{ch}}
 
 /* Reprise des données de la version 1.0 (paiements enregistrés + numéros modifiés) */
@@ -2087,7 +2096,7 @@ window.addEventListener("online",()=>{if(token&&gOn())gSched()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&token&&gOn()){const m=gMeta();if(m.dirty||!m.last||Date.now()-m.last>3e5)gSched()}});
 
 /* ===== PWA : installation et mises à jour (hébergement https uniquement) ===== */
-const APP_VERSION="5.3.0";
+const APP_VERSION="5.3.1";
 if(/netlify/i.test(location.hostname))document.documentElement.classList.add("nb");   /* le badge « Powered by Netlify » masque le bas de l'écran */
 let swReg=null,dip=null,updating=false;
 function showUpd(w){$("upd").hidden=false;$("updb").onclick=()=>{updating=true;w.postMessage("SKIP_WAITING")}}
@@ -2396,6 +2405,7 @@ function card(a,i){const st=(a.status||"").toLowerCase(),ok=st==="actif";
   '<div class="msg" style="margin-top:4px;color:var(--ink)">N° abonné <b>'+esc(a.numabo)+'</b>'+(a.numdecabo?' · Décodeur <b>'+esc(a.numdecabo)+'</b>':'')+'</div>'+
   '<div class="msg" style="margin-top:2px">'+esc(a.bouquet||"")+(a.finAbonnement?' · fin '+esc(a.finAbonnement):'')+(a.debutAbonnement?' · début '+esc(a.debutAbonnement):'')+'</div>'+
   (a.address?'<div class="msg" style="margin-top:2px">'+esc(a.address)+'</div>':'')+
+  '<div class="msg" id="cgt'+i+'" style="margin-top:2px">Contact : '+(a.telephone?esc(a.telephone):"recherche chez Vision Canal…")+'</div>'+
   '<div class="msg" style="margin-top:6px;color:'+(ok?'var(--ok)':'var(--or)')+';font-weight:600">'+esc(a.status||"")+'</div>'+
   '<div class="acts" style="margin-top:8px"><button class="btn full" type="button" data-i="'+i+'">Réactiver ce décodeur</button></div><div class="msg" id="cgx'+i+'" role="status"></div></div>'}
 let LIST=[],busy=false;
@@ -2405,7 +2415,8 @@ async function search(){if(busy)return;const v=$("cgav").value.trim(),m=$("cgam"
   busy=true;m.textContent="Recherche en cours…";$("cgar").innerHTML="";
   try{const r=await ENGINES.cga.call("search",{value:v});
     if(r.status!==200||!r.data||!r.data.success){m.textContent=(r.data&&r.data.message)||"CGA Canal indisponible pour le moment. Réessayez dans un instant.";if(r.status===401)m.textContent+=" Vérifiez vos identifiants dans Connexions."}
-    else{LIST=r.data.abonnes||[];m.textContent=LIST.length?LIST.length+" résultat"+(LIST.length>1?"s":""):"Aucun abonné trouvé.";$("cgar").innerHTML=LIST.map(card).join("")}}
+    else{LIST=r.data.abonnes||[];m.textContent=LIST.length?LIST.length+" résultat"+(LIST.length>1?"s":""):"Aucun abonné trouvé.";$("cgar").innerHTML=LIST.map(card).join("");
+      LIST.slice(0,5).forEach(async(a,i)=>{if(a.telephone)return;await vcEnrich(a);const el=$("cgt"+i);if(el)el.textContent=a.telephone?"Contact : "+a.telephone:"Contact : aucun numéro chez Vision Canal"})}}
   catch(e){m.textContent="Connexion internet indisponible."}
   busy=false;cgaStat()}
 async function react(i,btn){const a=LIST[i];if(!a||busy)return;if(!confirm("Réactiver le décodeur de "+(a.name||"cet abonné")+" (abonné "+a.numabo+") ?"))return;
