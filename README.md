@@ -42,3 +42,8 @@ Dans public/index.html, objet ENGINES : ajouter une entrée { hint, find(field, 
 - Connexions conservées sur l'appareil : Vision Canal et Veo Pro ne se reconnectent plus à chaque ouverture (reconnexion seulement si la session expire). CGA et Sygalin n'étaient déjà connectés qu'à la demande.
 - Google Drive : identifiant du fichier mémorisé (une requête de moins), synchronisation à l'ouverture seulement si plus de 5 min ou modifications non envoyées.
 - Veo Pro : vérification automatique au plus toutes les 5 min, même après fermeture de l'application.
+
+## Version 5.3.1 : contacts Vision Canal rétablis
+- Avec le moteur CGA (qui ne fournit pas le téléphone), le contact est maintenant repris automatiquement de Vision Canal à partir du N° abonné, à l'enregistrement d'un client, à l'actualisation depuis le serveur et dans l'onglet CGA.
+- La saisie manuelle du contact n'est demandée que si Vision Canal n'a réellement aucun numéro.
+- Prérequis : le compte Vision Canal doit être enregistré dans Paramètres > Connexions.
